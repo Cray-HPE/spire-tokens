@@ -1,0 +1,198 @@
+// Copyright 2020 Hewlett Packard Enterprise Development LP
+
+package tokens
+
+import (
+	"context"
+	"encoding/json"
+	"fmt"
+	"log"
+	"net"
+	"net/http"
+	"os"
+	"regexp"
+	"strconv"
+	"time"
+
+	"github.com/spiffe/spire/pkg/common/idutil"
+	"github.com/spiffe/spire/proto/spire/api/registration"
+	"github.com/spiffe/spire/proto/spire/common"
+	"google.golang.org/grpc"
+)
+
+const (
+	// Workload API (SPIRE default socket is assumed)
+	socketPath = "/tmp/spire-registration.sock"
+
+	// optional timeout for the client context
+	timeout = 5 * time.Second
+)
+
+// GenerateToken - generate new Spire Join token
+func GenerateToken(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	ctx := context.Background()
+
+	xname := r.FormValue("xname")
+	log.Printf("Starting token generation with xname: %s", xname)
+
+	ttl, err := strconv.Atoi(os.Getenv("TTL"))
+
+	if err != nil {
+		ttl = 60
+	}
+
+	if invalidID(xname) {
+		problem := ProblemDetails{
+			Title:  "Invalid or no xname provided",
+			Status: http.StatusNotFound,
+			Detail: fmt.Sprint("Xname must be alphanumeric"),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+		return
+	}
+
+	c, err := NewRegistrationClient(socketPath, ctx)
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error creating registration client",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	token, err := createToken(ctx, c, ttl)
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error generating token",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	isNCN, _ := regexp.MatchString("^ncn", xname)
+
+	var spiffe_id string
+	if isNCN {
+		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_ENTRY"), xname)
+	} else {
+		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_ENTRY"), xname)
+	}
+
+	node_parent := fmt.Sprintf("spiffe://%s/spire/agent/join_token/%s", os.Getenv("SPIRE_DOMAIN"), token)
+	err = createRegistrationRecord(ctx, c, node_parent, spiffe_id)
+
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error creating node registration record",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	log.Printf("Registration record generated with spiffeID: %s", spiffe_id)
+
+	var cluster_entry string
+	if isNCN {
+		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_CLUSTER_ENTRY"))
+	} else {
+		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_CLUSTER_ENTRY"))
+	}
+
+	err = createRegistrationRecord(ctx, c, spiffe_id, cluster_entry) // cluster record
+
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error creating cluster registration record",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	log.Printf("Cluster record generated with spiffeID: %s", cluster_entry)
+
+	w.WriteHeader(http.StatusCreated)
+
+	response := Token{
+		JoinToken: token,
+	}
+
+	json.NewEncoder(w).Encode(response)
+
+	return
+}
+
+func invalidID(id string) bool {
+
+	var validID = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
+
+	if id == "" {
+		return true
+	}
+	return !validID.MatchString(id)
+}
+
+func createToken(ctx context.Context, c registration.RegistrationClient, ttl int) (string, error) {
+	req := &registration.JoinToken{Ttl: int32(ttl)}
+	resp, err := c.CreateJoinToken(ctx, req)
+	if err != nil {
+		return "", err
+	}
+
+	return resp.Token, nil
+}
+
+func createRegistrationRecord(ctx context.Context, c registration.RegistrationClient, parentID, spiffeID string) error {
+	id, err := idutil.ParseSpiffeID(spiffeID, idutil.AllowAnyTrustDomainWorkload())
+	if err != nil {
+		return err
+	}
+
+	req := &common.RegistrationEntry{
+		ParentId: parentID,
+		SpiffeId: id.String(),
+		Selectors: []*common.Selector{
+			{Type: "spiffe_id", Value: parentID},
+		},
+	}
+
+	_, err = c.CreateEntryIfNotExists(ctx, req)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func NewRegistrationClient(socketPath string, ctx context.Context) (registration.RegistrationClient, error) {
+	conn, err := grpc.Dial(socketPath, grpc.WithInsecure(), grpc.WithDialer(dialer)) //nolint: staticcheck
+	if err != nil {
+		return nil, err
+	}
+	return registration.NewRegistrationClient(conn), err
+}
+
+func dialer(addr string, timeout time.Duration) (net.Conn, error) {
+	return net.DialTimeout("unix", addr, timeout)
+}
