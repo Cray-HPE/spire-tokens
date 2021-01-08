@@ -1,0 +1,83 @@
+openapi: 3.0.1
+info:
+  description: OpenAPI for spire-tokens
+  title: spire-tokens
+  version: 0.0.1
+servers:
+- url: https://spire-tokens:54440/api
+- url: https://spire-tokens.spire:54440/api
+paths:
+  /:
+    get:
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Info'
+          description: Root service/api info response
+      summary: Returns service/api info
+      tags:
+      - Info
+  /token:
+    post:
+      requestBody:
+        required: true
+        content:
+          application/x-www-form-urlencoded:
+            schema:
+              type: object
+              properties:
+                xname:
+                  type: string
+              required:
+                - xname
+      responses:
+        200:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+          description: Get the existing token for a given client
+        201:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Token'
+          description: Generate a new token for a given client
+        404:
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetails'
+          description: Client invalid or not found
+      summary: Get or generate the token for a given client
+      tags:
+      - Token
+components:
+  schemas:
+    Info:
+      example:
+        version: 0.0.1
+      properties:
+        version:
+          readOnly: true
+          type: string
+    Token:
+      example:
+        access_token: a7a02d62-7407-4c05-8100-7e687d3b7o65
+      properties:
+        join_token:
+          type: string
+    ProblemDetails:
+      example:
+        title: Not found
+        status: 404
+        detail: The item doesn't exist. It may have been deleted.
+      properties:
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
