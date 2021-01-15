@@ -7,4 +7,5 @@ dockerBuildPipeline {
     name = "spire-tokens"
     description = "Service for issuing spire join tokens"
         product = "csm"
+    githubPushRepo = "Cray-HPE/spire-tokens"
 }
