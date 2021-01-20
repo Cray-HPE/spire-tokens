@@ -107,7 +107,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	log.Printf("Registration record generated with spiffeID: %s", spiffe_id)
+	log.Printf("Registration record generated with spiffeID: %s (TTL: %d)", spiffe_id, int32(ttl))
 
 	var cluster_entry string
 	if isNCN {
@@ -155,6 +155,7 @@ func invalidID(id string) bool {
 }
 
 func createToken(ctx context.Context, c registration.RegistrationClient, ttl int) (string, error) {
+	log.Printf("Creating token with TTL: %d", int32(ttl))
 	req := &registration.JoinToken{Ttl: int32(ttl)}
 	resp, err := c.CreateJoinToken(ctx, req)
 	if err != nil {
