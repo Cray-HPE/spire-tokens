@@ -6,7 +6,7 @@ dockerBuildPipeline {
     app = "spire-tokens"
     name = "spire-tokens"
     description = "Service for issuing spire join tokens"
-        product = "csm"
-    githubPushRepo = "Cray-HPE/spire-tokens
-    githubPushBranches: /(release\/.*|master)/
+    product = "csm"
+    githubPushRepo = "Cray-HPE/spire-tokens"
+    githubPushBranches = /(release\/.*|master)/
 }
