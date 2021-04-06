@@ -1,5 +1,5 @@
 ########### Build ##########
-FROM dtr.dev.cray.com/baseos/golang:1.14-alpine AS build
+FROM arti.dev.cray.com/baseos-docker-master-local/golang:alpine3.12 AS build
 
 RUN apk add --no-cache git build-base
 
@@ -10,7 +10,7 @@ RUN cd /build && go test -v ./...
 RUN cd /build && go build -o /usr/local/bin/spire-tokens
 
 ########## Runtime ##########
-FROM dtr.dev.cray.com/baseos/alpine:3.12 AS runtime
+FROM arti.dev.cray.com/baseos-docker-master-local/alpine:3.13.2 AS runtime
 
 RUN apk add --no-cache bash curl
 
