@@ -6,10 +6,17 @@
 # these same unit tests) see runCoverage.sh. The same tests are getting
 # run in both places.
 
+set -ex
+
+docker run --rm -v ${WORKSPACE}:/mnt/workspace -w /mnt/workspace arti.dev.cray.com/baseos-docker-master-local/golang:alpine3.12 /bin/sh -c '
+set -ex -o pipefail
+
 echo "Unit Tests for Go"
 TEST_OUTPUT_DIR="$PWD/build/results/unittest"
 mkdir -p $TEST_OUTPUT_DIR
 export GOPATH="$HOME/go"
 export PATH="$PATH:$GOPATH/bin"
 go get -u github.com/jstemmer/go-junit-report
+export CGO_ENABLED=0
 go test ./tests -v | go-junit-report > "$TEST_OUTPUT_DIR/testing.xml"
+'
