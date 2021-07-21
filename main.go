@@ -10,7 +10,7 @@ import (
 	"sync"
 	"time"
 
-	tokens "stash.us.cray.com/spet/spire-tokens/go"
+	tokens "github.com/Cray-HPE/spire-tokens/go"
 )
 
 type keypair struct {

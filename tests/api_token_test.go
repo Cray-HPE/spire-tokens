@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	tokens "stash.us.cray.com/spet/spire-tokens/go"
+	tokens "github.com/Cray-HPE/spire-tokens/go"
 )
 
 func TestGenerateToken(t *testing.T) {
