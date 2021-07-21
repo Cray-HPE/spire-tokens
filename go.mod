@@ -1,4 +1,4 @@
-module stash.us.cray.com/spet/spire-tokens
+module github.com/Cray-HPE/spire-tokens
 
 go 1.14
 
