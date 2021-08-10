@@ -68,7 +68,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := createToken(ctx, c, ttl)
+	token, err := CreateToken(ctx, c, ttl)
 	if err != nil {
 		problem := ProblemDetails{
 			Title:  "Error generating token",
@@ -92,7 +92,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	node_parent := fmt.Sprintf("spiffe://%s/spire/agent/join_token/%s", os.Getenv("SPIRE_DOMAIN"), token)
-	err = createRegistrationRecord(ctx, c, node_parent, spiffe_id)
+	err = CreateRegistrationRecord(ctx, c, node_parent, spiffe_id)
 
 	if err != nil {
 		problem := ProblemDetails{
@@ -116,7 +116,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_CLUSTER_ENTRY"))
 	}
 
-	err = createRegistrationRecord(ctx, c, spiffe_id, cluster_entry) // cluster record
+	err = CreateRegistrationRecord(ctx, c, spiffe_id, cluster_entry) // cluster record
 
 	if err != nil {
 		problem := ProblemDetails{
@@ -154,7 +154,7 @@ func invalidID(id string) bool {
 	return !validID.MatchString(id)
 }
 
-func createToken(ctx context.Context, c registration.RegistrationClient, ttl int) (string, error) {
+func CreateToken(ctx context.Context, c registration.RegistrationClient, ttl int) (string, error) {
 	req := &registration.JoinToken{Ttl: int32(ttl)}
 	resp, err := c.CreateJoinToken(ctx, req)
 	if err != nil {
@@ -164,7 +164,7 @@ func createToken(ctx context.Context, c registration.RegistrationClient, ttl int
 	return resp.Token, nil
 }
 
-func createRegistrationRecord(ctx context.Context, c registration.RegistrationClient, parentID, spiffeID string) error {
+func CreateRegistrationRecord(ctx context.Context, c registration.RegistrationClient, parentID, spiffeID string) error {
 	id, err := idutil.ParseSpiffeID(spiffeID, idutil.AllowAnyTrustDomainWorkload())
 	if err != nil {
 		return err

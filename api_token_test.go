@@ -2,12 +2,18 @@
 package main
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 
 	tokens "github.com/Cray-HPE/spire-tokens/go"
+	"github.com/spiffe/spire/pkg/server/plugin/datastore"
+	"github.com/spiffe/spire/test/fakes/fakedatastore"
+	"github.com/spiffe/spire/test/fakes/fakeregistrationclient"
+	"github.com/stretchr/testify/require"
 )
 
 func TestGenerateToken(t *testing.T) {
@@ -33,6 +39,43 @@ func TestGenerateToken(t *testing.T) {
 	}
 }
 
+func TestCreateToken(t *testing.T) {
+	ds := fakedatastore.New(t)
+	ctx := context.Background()
+	c := fakeregistrationclient.New(t, "spiffe://shasta", ds, nil)
+	ttl := 6000
+	token, err := tokens.CreateToken(ctx, c, ttl)
+
+	if err != nil {
+		t.Errorf("Failed to create token : %v", err)
+	}
+
+	var validToken = regexp.MustCompile(`^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89aAbB][a-f0-9]{3}-[a-f0-9]{12}$`)
+
+	if !validToken.MatchString(token) {
+		t.Errorf("CreateToken did not return a valid UUID: %v", token)
+	}
+}
+
+func TestCreateRegistrationRecord(t *testing.T) {
+	ds := fakedatastore.New(t)
+	ctx := context.Background()
+	c := fakeregistrationclient.New(t, "spiffe://shasta", ds, nil)
+	parentID := "spiffe://shasta/spire/agent/join_token/TOKEN"
+	spiffeID := "spiffe://shasta/ncn/xname"
+	err := tokens.CreateRegistrationRecord(ctx, c, parentID, spiffeID)
+
+	if err != nil {
+		t.Errorf("Failed to create registration record: %v", err)
+	}
+	regEntries, err := ds.ListRegistrationEntries(ctx, &datastore.ListRegistrationEntriesRequest{})
+	if err != nil {
+		t.Errorf("Failed to request registration entries: %v", err)
+	}
+	require.Equal(t, regEntries.Entries[0].SpiffeId, "spiffe://shasta/ncn/xname")
+	require.Equal(t, regEntries.Entries[0].ParentId, "spiffe://shasta/spire/agent/join_token/TOKEN")
+	require.Equal(t, regEntries.Entries[0].Selectors[0].Value, "spiffe://shasta/spire/agent/join_token/TOKEN")
+}
 func TestGenerateTokenBadXname(t *testing.T) {
 	// Pass compliant xname to test
 	xname := strings.NewReader(`xname=&123`)

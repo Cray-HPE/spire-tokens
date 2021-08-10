@@ -22,12 +22,16 @@
 
 NAME ?= spire-tokens
 export VERSION ?= $(shell cat .version)-local
+export WORKSPACE = $(shell pwd)
 export DOCKER_IMAGE ?= ${NAME}:${VERSION}
 
-all: image test
+all: image test-docker
 
 image:
 		docker build --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
 
 test:
+	go test
+
+test-docker:
 		./runUnitTest.sh

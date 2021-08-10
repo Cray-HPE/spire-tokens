@@ -8,7 +8,7 @@
 
 set -ex
 
-docker run --rm -v ${WORKSPACE}:/mnt/workspace -w /mnt/workspace arti.dev.cray.com/baseos-docker-master-local/golang:alpine3.12 /bin/sh -c '
+docker run --rm -v ${WORKSPACE}:/mnt/workspace -w /mnt/workspace golang:alpine /bin/sh -c '
 set -ex -o pipefail
 
 echo "Unit Tests for Go"
