@@ -1,0 +1,16 @@
+---
+- parentID: spiffe://shasta/ncn
+  spiffeID: spiffe://shasta/ncn/XNAME/workload1
+  selectors:
+    - type: unix
+      value: uid:0
+    - type: unix
+      value: gid:0
+- parentID: spiffe://shasta/ncn
+  spiffeID: spiffe://shasta/ncn/XNAME/workload2
+  selectors:
+    - type: unix
+      value: uid:0
+    - type: unix
+      value: gid:0
+

@@ -8,7 +8,7 @@
 
 set -ex
 
-docker run --rm -v ${WORKSPACE}:/mnt/workspace -w /mnt/workspace golang:alpine /bin/sh -c '
+docker run --rm -v ${WORKSPACE}:/mnt/workspace -w /mnt/workspace artifactory.algol60.net/docker.io/golang:alpine /bin/sh -c '
 set -ex -o pipefail
 
 echo "Unit Tests for Go"
@@ -18,5 +18,5 @@ export GOPATH="$HOME/go"
 export PATH="$PATH:$GOPATH/bin"
 go get -u github.com/jstemmer/go-junit-report
 export CGO_ENABLED=0
-go test ./tests -v | go-junit-report > "$TEST_OUTPUT_DIR/testing.xml"
+go test -v | go-junit-report > "$TEST_OUTPUT_DIR/testing.xml"
 '

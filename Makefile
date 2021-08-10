@@ -25,13 +25,10 @@ export VERSION ?= $(shell cat .version)-local
 export WORKSPACE = $(shell pwd)
 export DOCKER_IMAGE ?= ${NAME}:${VERSION}
 
-all: image test-docker
+all: image test
 
 image:
 		docker build --pull ${DOCKER_ARGS} --tag '${NAME}:${VERSION}' .
 
 test:
-	go test
-
-test-docker:
 		./runUnitTest.sh

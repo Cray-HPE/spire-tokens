@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
@@ -18,7 +19,18 @@ import (
 	"github.com/spiffe/spire/proto/spire/api/registration"
 	"github.com/spiffe/spire/proto/spire/common"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v2"
 )
+
+type WorkloadSelector struct {
+	Type  string `yaml:"type"`
+	Value string `yaml:"value"`
+}
+type Workload struct {
+	ParentID  string             `yaml:"parentID"`
+	SpiffeID  string             `yaml:"spiffeID"`
+	Selectors []WorkloadSelector `yaml:"selectors"`
+}
 
 const (
 	// Workload API (SPIRE default socket is assumed)
@@ -110,10 +122,13 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Registration record generated with spiffeID: %s", spiffe_id)
 
 	var cluster_entry string
+	var workload_file string
 	if isNCN {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_CLUSTER_ENTRY"))
+		workload_file = "/workloads/ncn.yaml"
 	} else {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_CLUSTER_ENTRY"))
+		workload_file = "/workloads/compute.yaml"
 	}
 
 	err = CreateRegistrationRecord(ctx, c, spiffe_id, cluster_entry) // cluster record
@@ -121,6 +136,36 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		problem := ProblemDetails{
 			Title:  "Error creating cluster registration record",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	workloads, err := ParseWorkloads(workload_file)
+
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error Reading Workloads Configuration file",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	err = CreateWorkloads(ctx, c, xname, workloads)
+
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error Reading Workloads Configuration file",
 			Status: http.StatusInternalServerError,
 			Detail: fmt.Sprint(err.Error()),
 		}
@@ -183,6 +228,45 @@ func CreateRegistrationRecord(ctx context.Context, c registration.RegistrationCl
 		return err
 	}
 	return nil
+}
+
+func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xname string, workloads []Workload) error {
+
+	for _, workload := range workloads {
+		m := regexp.MustCompile("^(.*)XNAME(.*)$")
+		workloadID := m.ReplaceAllString(workload.SpiffeID, "${1}"+xname+"${2}")
+
+		selectors := []*common.Selector{}
+		for _, selector := range workload.Selectors {
+			selectors = append(selectors, &common.Selector{Type: selector.Type, Value: selector.Value})
+		}
+
+		req := &common.RegistrationEntry{
+			ParentId:  workload.ParentID,
+			SpiffeId:  workloadID,
+			Selectors: selectors,
+		}
+
+		_, err := c.CreateEntryIfNotExists(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ParseWorkloads(file string) ([]Workload, error) {
+	yamlFile, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	workloads := []Workload{}
+	err = yaml.Unmarshal(yamlFile, &workloads)
+	if err != nil {
+		return nil, err
+	}
+
+	return workloads, nil
 }
 
 func NewRegistrationClient(socketPath string, ctx context.Context) (registration.RegistrationClient, error) {
