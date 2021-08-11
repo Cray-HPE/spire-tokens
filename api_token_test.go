@@ -99,6 +99,7 @@ func TestParseWorkloads(t *testing.T) {
 				{Type: "unix", Value: "uid:0"},
 				{Type: "unix", Value: "gid:0"},
 			},
+			Ttl: 634000,
 		},
 	}
 	require.Equal(t, expected, actual)
@@ -124,6 +125,7 @@ func TestCreateWorkloads(t *testing.T) {
 				{Type: "unix", Value: "uid:0"},
 				{Type: "unix", Value: "gid:0"},
 			},
+			Ttl: 634000,
 		},
 	}
 
@@ -148,6 +150,7 @@ func TestCreateWorkloads(t *testing.T) {
 	require.Equal(t, regEntries.Entries[1].ParentId, "spiffe://shasta/ncn")
 	require.Equal(t, regEntries.Entries[1].Selectors[0].Value, "gid:0")
 	require.Equal(t, regEntries.Entries[1].Selectors[1].Value, "uid:0")
+	require.Equal(t, regEntries.Entries[1].Ttl, int32(634000))
 	require.Equal(t, regEntries.Entries[2].SpiffeId, "spiffe://shasta/ncn/xname2/workload1")
 	require.Equal(t, regEntries.Entries[2].ParentId, "spiffe://shasta/ncn")
 	require.Equal(t, regEntries.Entries[2].Selectors[0].Value, "gid:0")
@@ -156,6 +159,7 @@ func TestCreateWorkloads(t *testing.T) {
 	require.Equal(t, regEntries.Entries[3].ParentId, "spiffe://shasta/ncn")
 	require.Equal(t, regEntries.Entries[3].Selectors[0].Value, "gid:0")
 	require.Equal(t, regEntries.Entries[3].Selectors[1].Value, "uid:0")
+	require.Equal(t, regEntries.Entries[3].Ttl, int32(634000))
 }
 func TestGenerateTokenBadXname(t *testing.T) {
 	// Pass compliant xname to test

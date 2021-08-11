@@ -30,6 +30,7 @@ type Workload struct {
 	ParentID  string             `yaml:"parentID"`
 	SpiffeID  string             `yaml:"spiffeID"`
 	Selectors []WorkloadSelector `yaml:"selectors"`
+	Ttl       int32              `yaml:"ttl,omitempty"`
 }
 
 const (
@@ -241,10 +242,21 @@ func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xna
 			selectors = append(selectors, &common.Selector{Type: selector.Type, Value: selector.Value})
 		}
 
-		req := &common.RegistrationEntry{
-			ParentId:  workload.ParentID,
-			SpiffeId:  workloadID,
-			Selectors: selectors,
+		var req *common.RegistrationEntry
+		if workload.Ttl != 0 {
+			req = &common.RegistrationEntry{
+				ParentId:  workload.ParentID,
+				SpiffeId:  workloadID,
+				Selectors: selectors,
+				Ttl:       workload.Ttl,
+			}
+		} else {
+			req = &common.RegistrationEntry{
+				ParentId:  workload.ParentID,
+				SpiffeId:  workloadID,
+				Selectors: selectors,
+			}
+
 		}
 
 		_, err := c.CreateEntryIfNotExists(ctx, req)
