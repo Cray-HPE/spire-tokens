@@ -85,7 +85,6 @@ func TestParseWorkloads(t *testing.T) {
 
 	var expected = []tokens.Workload{
 		{
-			ParentID: "spiffe://shasta/ncn",
 			SpiffeID: "spiffe://shasta/ncn/XNAME/workload1",
 			Selectors: []tokens.WorkloadSelector{
 				{Type: "unix", Value: "uid:0"},
@@ -93,7 +92,6 @@ func TestParseWorkloads(t *testing.T) {
 			},
 		},
 		{
-			ParentID: "spiffe://shasta/ncn",
 			SpiffeID: "spiffe://shasta/ncn/XNAME/workload2",
 			Selectors: []tokens.WorkloadSelector{
 				{Type: "unix", Value: "uid:0"},
@@ -111,7 +109,6 @@ func TestCreateWorkloads(t *testing.T) {
 	xnames := []string{"xname1", "xname2"}
 	var workloads = []tokens.Workload{
 		{
-			ParentID: "spiffe://shasta/ncn",
 			SpiffeID: "spiffe://shasta/ncn/XNAME/workload1",
 			Selectors: []tokens.WorkloadSelector{
 				{Type: "unix", Value: "uid:0"},
@@ -119,7 +116,6 @@ func TestCreateWorkloads(t *testing.T) {
 			},
 		},
 		{
-			ParentID: "spiffe://shasta/ncn",
 			SpiffeID: "spiffe://shasta/ncn/XNAME/workload2",
 			Selectors: []tokens.WorkloadSelector{
 				{Type: "unix", Value: "uid:0"},
@@ -143,20 +139,20 @@ func TestCreateWorkloads(t *testing.T) {
 	}
 
 	require.Equal(t, "spiffe://shasta/ncn/xname1/workload1", regEntries.Entries[0].SpiffeId)
-	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[0].ParentId)
+	require.Equal(t, "spiffe://shasta/ncn/tenant1/xname1", regEntries.Entries[0].ParentId)
 	require.Equal(t, "gid:0", regEntries.Entries[0].Selectors[0].Value)
 	require.Equal(t, "uid:0", regEntries.Entries[0].Selectors[1].Value)
 	require.Equal(t, "spiffe://shasta/ncn/xname1/workload2", regEntries.Entries[1].SpiffeId)
-	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[1].ParentId)
+	require.Equal(t, "spiffe://shasta/ncn/tenant1/xname1", regEntries.Entries[1].ParentId)
 	require.Equal(t, "gid:0", regEntries.Entries[1].Selectors[0].Value)
 	require.Equal(t, "uid:0", regEntries.Entries[1].Selectors[1].Value)
 	require.Equal(t, int32(634000), regEntries.Entries[1].Ttl)
 	require.Equal(t, "spiffe://shasta/ncn/xname2/workload1", regEntries.Entries[2].SpiffeId)
-	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[2].ParentId)
+	require.Equal(t, "spiffe://shasta/ncn/tenant1/xname2", regEntries.Entries[2].ParentId)
 	require.Equal(t, "gid:0", regEntries.Entries[2].Selectors[0].Value)
 	require.Equal(t, "uid:0", regEntries.Entries[2].Selectors[1].Value)
 	require.Equal(t, "spiffe://shasta/ncn/xname2/workload2", regEntries.Entries[3].SpiffeId)
-	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[3].ParentId)
+	require.Equal(t, "spiffe://shasta/ncn/tenant1/xname2", regEntries.Entries[3].ParentId)
 	require.Equal(t, "gid:0", regEntries.Entries[3].Selectors[0].Value)
 	require.Equal(t, "uid:0", regEntries.Entries[3].Selectors[1].Value)
 	require.Equal(t, int32(634000), regEntries.Entries[3].Ttl)

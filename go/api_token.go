@@ -27,7 +27,6 @@ type WorkloadSelector struct {
 	Value string `yaml:"value"`
 }
 type Workload struct {
-	ParentID  string             `yaml:"parentID"`
 	SpiffeID  string             `yaml:"spiffeID"`
 	Selectors []WorkloadSelector `yaml:"selectors"`
 	Ttl       int32              `yaml:"ttl,omitempty"`
@@ -245,14 +244,14 @@ func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xna
 		var req *common.RegistrationEntry
 		if workload.Ttl != 0 {
 			req = &common.RegistrationEntry{
-				ParentId:  workload.ParentID,
+				ParentId:  "spiffe://shasta/ncn/tenant1/" + xname,
 				SpiffeId:  workloadID,
 				Selectors: selectors,
 				Ttl:       workload.Ttl,
 			}
 		} else {
 			req = &common.RegistrationEntry{
-				ParentId:  workload.ParentID,
+				ParentId:  "spiffe://shasta/ncn/tenant1/" + xname,
 				SpiffeId:  workloadID,
 				Selectors: selectors,
 			}
