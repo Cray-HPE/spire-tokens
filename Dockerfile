@@ -1,7 +1,5 @@
 ########### Build ##########
-FROM artifactory.algol60.net/docker.io/golang:alpine AS build
-
-RUN apk add --no-cache git build-base
+FROM artifactory.algol60.net/docker.io/golang:buster AS build
 
 RUN mkdir -p /build
 COPY . /build
