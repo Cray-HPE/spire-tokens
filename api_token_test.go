@@ -72,9 +72,9 @@ func TestCreateRegistrationRecord(t *testing.T) {
 	if err != nil {
 		t.Errorf("Failed to request registration entries: %v", err)
 	}
-	require.Equal(t, regEntries.Entries[0].SpiffeId, "spiffe://shasta/ncn/xname")
-	require.Equal(t, regEntries.Entries[0].ParentId, "spiffe://shasta/spire/agent/join_token/TOKEN")
-	require.Equal(t, regEntries.Entries[0].Selectors[0].Value, "spiffe://shasta/spire/agent/join_token/TOKEN")
+	require.Equal(t, "spiffe://shasta/ncn/xname", regEntries.Entries[0].SpiffeId)
+	require.Equal(t, "spiffe://shasta/spire/agent/join_token/TOKEN", regEntries.Entries[0].ParentId)
+	require.Equal(t, "spiffe://shasta/spire/agent/join_token/TOKEN", regEntries.Entries[0].Selectors[0].Value)
 }
 
 func TestParseWorkloads(t *testing.T) {
@@ -102,7 +102,7 @@ func TestParseWorkloads(t *testing.T) {
 			Ttl: 634000,
 		},
 	}
-	require.Equal(t, expected, actual)
+	require.Equal(t, actual, expected)
 }
 func TestCreateWorkloads(t *testing.T) {
 	ds := fakedatastore.New(t)
@@ -142,24 +142,24 @@ func TestCreateWorkloads(t *testing.T) {
 		t.Errorf("Failed to request registration entries: %v", err)
 	}
 
-	require.Equal(t, regEntries.Entries[0].SpiffeId, "spiffe://shasta/ncn/xname1/workload1")
-	require.Equal(t, regEntries.Entries[0].ParentId, "spiffe://shasta/ncn")
-	require.Equal(t, regEntries.Entries[0].Selectors[0].Value, "gid:0")
-	require.Equal(t, regEntries.Entries[0].Selectors[1].Value, "uid:0")
-	require.Equal(t, regEntries.Entries[1].SpiffeId, "spiffe://shasta/ncn/xname1/workload2")
-	require.Equal(t, regEntries.Entries[1].ParentId, "spiffe://shasta/ncn")
-	require.Equal(t, regEntries.Entries[1].Selectors[0].Value, "gid:0")
-	require.Equal(t, regEntries.Entries[1].Selectors[1].Value, "uid:0")
-	require.Equal(t, regEntries.Entries[1].Ttl, int32(634000))
-	require.Equal(t, regEntries.Entries[2].SpiffeId, "spiffe://shasta/ncn/xname2/workload1")
-	require.Equal(t, regEntries.Entries[2].ParentId, "spiffe://shasta/ncn")
-	require.Equal(t, regEntries.Entries[2].Selectors[0].Value, "gid:0")
-	require.Equal(t, regEntries.Entries[2].Selectors[1].Value, "uid:0")
-	require.Equal(t, regEntries.Entries[3].SpiffeId, "spiffe://shasta/ncn/xname2/workload2")
-	require.Equal(t, regEntries.Entries[3].ParentId, "spiffe://shasta/ncn")
-	require.Equal(t, regEntries.Entries[3].Selectors[0].Value, "gid:0")
-	require.Equal(t, regEntries.Entries[3].Selectors[1].Value, "uid:0")
-	require.Equal(t, regEntries.Entries[3].Ttl, int32(634000))
+	require.Equal(t, "spiffe://shasta/ncn/xname1/workload1", regEntries.Entries[0].SpiffeId)
+	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[0].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[0].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[0].Selectors[1].Value)
+	require.Equal(t, "spiffe://shasta/ncn/xname1/workload2", regEntries.Entries[1].SpiffeId)
+	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[1].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[1].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[1].Selectors[1].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[1].Ttl)
+	require.Equal(t, "spiffe://shasta/ncn/xname2/workload1", regEntries.Entries[2].SpiffeId)
+	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[2].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[2].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[2].Selectors[1].Value)
+	require.Equal(t, "spiffe://shasta/ncn/xname2/workload2", regEntries.Entries[3].SpiffeId)
+	require.Equal(t, "spiffe://shasta/ncn", regEntries.Entries[3].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[3].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[3].Selectors[1].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[3].Ttl)
 }
 func TestGenerateTokenBadXname(t *testing.T) {
 	// Pass compliant xname to test
