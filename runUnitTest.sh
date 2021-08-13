@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Copyright 2020 Hewlett Packard Enterprise Development LP
+# Copyright 2021 Hewlett Packard Enterprise Development LP
 # NOTE -- The following syntax will run unit tests without worrying
 # about code coverage. To see an example of code coverage (which re-runs
 # these same unit tests) see runCoverage.sh. The same tests are getting
