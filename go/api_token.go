@@ -237,6 +237,14 @@ func CreateRegistrationRecord(ctx context.Context, c registration.RegistrationCl
 
 func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xname string, workloads []Workload) error {
 
+	var serverType string
+	isNCN, _ := regexp.MatchString("^ncn", xname)
+	if isNCN {
+		serverType = "ncn"
+	} else {
+		serverType = "compute"
+	}
+
 	for _, workload := range workloads {
 		m := regexp.MustCompile("^(.*)XNAME(.*)$")
 		workloadID := m.ReplaceAllString(workload.SpiffeID, "${1}"+xname+"${2}")
@@ -249,14 +257,14 @@ func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xna
 		var req *common.RegistrationEntry
 		if workload.Ttl != 0 {
 			req = &common.RegistrationEntry{
-				ParentId:  "spiffe://shasta/ncn/tenant1/" + xname,
+				ParentId:  "spiffe://shasta/" + serverType + "/tenant1/" + xname,
 				SpiffeId:  workloadID,
 				Selectors: selectors,
 				Ttl:       workload.Ttl,
 			}
 		} else {
 			req = &common.RegistrationEntry{
-				ParentId:  "spiffe://shasta/ncn/tenant1/" + xname,
+				ParentId:  "spiffe://shasta/" + serverType + "/tenant1/" + xname,
 				SpiffeId:  workloadID,
 				Selectors: selectors,
 			}
