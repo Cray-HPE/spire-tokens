@@ -148,6 +148,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if strings.ToLower(os.Getenv("ENABLE_XNAME_WORKLOADS")) == "true" {
+		log.Printf("Creating xname workload entries for %s", xname)
 
 		workloads, err := ParseWorkloads(workload_file)
 
