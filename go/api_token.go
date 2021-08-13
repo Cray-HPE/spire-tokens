@@ -13,6 +13,7 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spiffe/spire/pkg/common/idutil"
@@ -146,34 +147,37 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	workloads, err := ParseWorkloads(workload_file)
+	if strings.ToLower(os.Getenv("ENABLE_XNAME_WORKLOADS")) == "true" {
 
-	if err != nil {
-		problem := ProblemDetails{
-			Title:  "Error Reading Workloads Configuration file",
-			Status: http.StatusInternalServerError,
-			Detail: fmt.Sprint(err.Error()),
+		workloads, err := ParseWorkloads(workload_file)
+
+		if err != nil {
+			problem := ProblemDetails{
+				Title:  "Error Reading Workloads Configuration file",
+				Status: http.StatusInternalServerError,
+				Detail: fmt.Sprint(err.Error()),
+			}
+			log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(problem)
+
+			return
 		}
-		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(problem)
 
-		return
-	}
+		err = CreateWorkloads(ctx, c, xname, workloads)
 
-	err = CreateWorkloads(ctx, c, xname, workloads)
+		if err != nil {
+			problem := ProblemDetails{
+				Title:  "Error Reading Workloads Configuration file",
+				Status: http.StatusInternalServerError,
+				Detail: fmt.Sprint(err.Error()),
+			}
+			log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(problem)
 
-	if err != nil {
-		problem := ProblemDetails{
-			Title:  "Error Reading Workloads Configuration file",
-			Status: http.StatusInternalServerError,
-			Detail: fmt.Sprint(err.Error()),
+			return
 		}
-		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
-		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(problem)
-
-		return
 	}
 
 	log.Printf("Cluster record generated with spiffeID: %s", cluster_entry)
