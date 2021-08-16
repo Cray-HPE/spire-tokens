@@ -1,4 +1,4 @@
-// Copyright 2020 Hewlett Packard Enterprise Development LP
+// Copyright 2021 Hewlett Packard Enterprise Development LP
 
 package tokens
 
@@ -6,19 +6,32 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"os"
 	"regexp"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/spiffe/spire/pkg/common/idutil"
 	"github.com/spiffe/spire/proto/spire/api/registration"
 	"github.com/spiffe/spire/proto/spire/common"
 	"google.golang.org/grpc"
+	"gopkg.in/yaml.v2"
 )
+
+type WorkloadSelector struct {
+	Type  string `yaml:"type"`
+	Value string `yaml:"value"`
+}
+type Workload struct {
+	SpiffeID  string             `yaml:"spiffeID"`
+	Selectors []WorkloadSelector `yaml:"selectors"`
+	Ttl       int32              `yaml:"ttl,omitempty"`
+}
 
 const (
 	// Workload API (SPIRE default socket is assumed)
@@ -68,7 +81,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := createToken(ctx, c, ttl)
+	token, err := CreateToken(ctx, c, ttl)
 	if err != nil {
 		problem := ProblemDetails{
 			Title:  "Error generating token",
@@ -92,7 +105,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	node_parent := fmt.Sprintf("spiffe://%s/spire/agent/join_token/%s", os.Getenv("SPIRE_DOMAIN"), token)
-	err = createRegistrationRecord(ctx, c, node_parent, spiffe_id)
+	err = CreateRegistrationRecord(ctx, c, node_parent, spiffe_id)
 
 	if err != nil {
 		problem := ProblemDetails{
@@ -110,13 +123,16 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Registration record generated with spiffeID: %s", spiffe_id)
 
 	var cluster_entry string
+	var workload_file string
 	if isNCN {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_CLUSTER_ENTRY"))
+		workload_file = "/workloads/ncn.yaml"
 	} else {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_CLUSTER_ENTRY"))
+		workload_file = "/workloads/compute.yaml"
 	}
 
-	err = createRegistrationRecord(ctx, c, spiffe_id, cluster_entry) // cluster record
+	err = CreateRegistrationRecord(ctx, c, spiffe_id, cluster_entry) // cluster record
 
 	if err != nil {
 		problem := ProblemDetails{
@@ -129,6 +145,40 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(problem)
 
 		return
+	}
+
+	if strings.ToLower(os.Getenv("ENABLE_XNAME_WORKLOADS")) == "true" {
+		log.Printf("Creating xname workload entries for %s", xname)
+
+		workloads, err := ParseWorkloads(workload_file)
+
+		if err != nil {
+			problem := ProblemDetails{
+				Title:  "Error Reading Workloads Configuration file",
+				Status: http.StatusInternalServerError,
+				Detail: fmt.Sprint(err.Error()),
+			}
+			log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(problem)
+
+			return
+		}
+
+		err = CreateWorkloads(ctx, c, xname, workloads)
+
+		if err != nil {
+			problem := ProblemDetails{
+				Title:  "Error Reading Workloads Configuration file",
+				Status: http.StatusInternalServerError,
+				Detail: fmt.Sprint(err.Error()),
+			}
+			log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+			w.WriteHeader(http.StatusInternalServerError)
+			json.NewEncoder(w).Encode(problem)
+
+			return
+		}
 	}
 
 	log.Printf("Cluster record generated with spiffeID: %s", cluster_entry)
@@ -154,7 +204,7 @@ func invalidID(id string) bool {
 	return !validID.MatchString(id)
 }
 
-func createToken(ctx context.Context, c registration.RegistrationClient, ttl int) (string, error) {
+func CreateToken(ctx context.Context, c registration.RegistrationClient, ttl int) (string, error) {
 	req := &registration.JoinToken{Ttl: int32(ttl)}
 	resp, err := c.CreateJoinToken(ctx, req)
 	if err != nil {
@@ -164,7 +214,7 @@ func createToken(ctx context.Context, c registration.RegistrationClient, ttl int
 	return resp.Token, nil
 }
 
-func createRegistrationRecord(ctx context.Context, c registration.RegistrationClient, parentID, spiffeID string) error {
+func CreateRegistrationRecord(ctx context.Context, c registration.RegistrationClient, parentID, spiffeID string) error {
 	id, err := idutil.ParseSpiffeID(spiffeID, idutil.AllowAnyTrustDomainWorkload())
 	if err != nil {
 		return err
@@ -183,6 +233,64 @@ func createRegistrationRecord(ctx context.Context, c registration.RegistrationCl
 		return err
 	}
 	return nil
+}
+
+func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xname string, workloads []Workload) error {
+
+	var serverType string
+	isNCN, _ := regexp.MatchString("^ncn", xname)
+	if isNCN {
+		serverType = "ncn"
+	} else {
+		serverType = "compute"
+	}
+
+	for _, workload := range workloads {
+		m := regexp.MustCompile("^(.*)XNAME(.*)$")
+		workloadID := m.ReplaceAllString(workload.SpiffeID, "${1}"+xname+"${2}")
+
+		selectors := []*common.Selector{}
+		for _, selector := range workload.Selectors {
+			selectors = append(selectors, &common.Selector{Type: selector.Type, Value: selector.Value})
+		}
+
+		var req *common.RegistrationEntry
+		if workload.Ttl != 0 {
+			req = &common.RegistrationEntry{
+				ParentId:  "spiffe://shasta/" + serverType + "/tenant1/" + xname,
+				SpiffeId:  workloadID,
+				Selectors: selectors,
+				Ttl:       workload.Ttl,
+			}
+		} else {
+			req = &common.RegistrationEntry{
+				ParentId:  "spiffe://shasta/" + serverType + "/tenant1/" + xname,
+				SpiffeId:  workloadID,
+				Selectors: selectors,
+			}
+
+		}
+
+		_, err := c.CreateEntryIfNotExists(ctx, req)
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func ParseWorkloads(file string) ([]Workload, error) {
+	yamlFile, err := ioutil.ReadFile(file)
+	if err != nil {
+		return nil, err
+	}
+	workloads := []Workload{}
+	err = yaml.Unmarshal(yamlFile, &workloads)
+	if err != nil {
+		return nil, err
+	}
+
+	return workloads, nil
 }
 
 func NewRegistrationClient(socketPath string, ctx context.Context) (registration.RegistrationClient, error) {
