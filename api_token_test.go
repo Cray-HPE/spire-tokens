@@ -158,6 +158,61 @@ func TestCreateWorkloadsCompute(t *testing.T) {
 	require.Equal(t, "uid:0", regEntries.Entries[3].Selectors[1].Value)
 	require.Equal(t, int32(634000), regEntries.Entries[3].Ttl)
 }
+func TestCreateWorkloadsStorage(t *testing.T) {
+	ds := fakedatastore.New(t)
+	ctx := context.Background()
+	c := fakeregistrationclient.New(t, "spiffe://shasta", ds, nil)
+	xnames := []string{"storage1", "storage2"}
+	var workloads = []tokens.Workload{
+		{
+			SpiffeID: "spiffe://shasta/test/XNAME/workload1",
+			Selectors: []tokens.WorkloadSelector{
+				{Type: "unix", Value: "uid:0"},
+				{Type: "unix", Value: "gid:0"},
+			},
+		},
+		{
+			SpiffeID: "spiffe://shasta/test/XNAME/workload2",
+			Selectors: []tokens.WorkloadSelector{
+				{Type: "unix", Value: "uid:0"},
+				{Type: "unix", Value: "gid:0"},
+			},
+			Ttl: 634000,
+		},
+	}
+
+	for _, xname := range xnames {
+		err := tokens.CreateWorkloads(ctx, c, xname, workloads, "storage")
+
+		if err != nil {
+			t.Errorf("Failed to create registration record: %v", err)
+		}
+	}
+
+	regEntries, err := ds.ListRegistrationEntries(ctx, &datastore.ListRegistrationEntriesRequest{})
+	if err != nil {
+		t.Errorf("Failed to request registration entries: %v", err)
+	}
+
+	require.Equal(t, "spiffe://shasta/test/storage1/workload1", regEntries.Entries[0].SpiffeId)
+	require.Equal(t, "spiffe://shasta/storage/tenant1/storage1", regEntries.Entries[0].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[0].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[0].Selectors[1].Value)
+	require.Equal(t, "spiffe://shasta/test/storage1/workload2", regEntries.Entries[1].SpiffeId)
+	require.Equal(t, "spiffe://shasta/storage/tenant1/storage1", regEntries.Entries[1].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[1].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[1].Selectors[1].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[1].Ttl)
+	require.Equal(t, "spiffe://shasta/test/storage2/workload1", regEntries.Entries[2].SpiffeId)
+	require.Equal(t, "spiffe://shasta/storage/tenant1/storage2", regEntries.Entries[2].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[2].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[2].Selectors[1].Value)
+	require.Equal(t, "spiffe://shasta/test/storage2/workload2", regEntries.Entries[3].SpiffeId)
+	require.Equal(t, "spiffe://shasta/storage/tenant1/storage2", regEntries.Entries[3].ParentId)
+	require.Equal(t, "gid:0", regEntries.Entries[3].Selectors[0].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[3].Selectors[1].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[3].Ttl)
+}
 func TestCreateWorkloadsNcn(t *testing.T) {
 	ds := fakedatastore.New(t)
 	ctx := context.Background()
