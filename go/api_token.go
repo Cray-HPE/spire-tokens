@@ -106,6 +106,8 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_ENTRY"), xname)
 	} else if serverType == "storage" {
 		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("STORAGE_ENTRY"), xname)
+	} else if serverType == "uan" {
+		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("UAN_ENTRY"), xname)
 	} else {
 		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_ENTRY"), xname)
 	}
@@ -136,6 +138,9 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	} else if serverType == "storage" {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("STORAGE_CLUSTER_ENTRY"))
 		workload_file = "/workloads/storage.yaml"
+	} else if serverType == "uan" {
+		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("UAN_CLUSTER_ENTRY"))
+		workload_file = "/workloads/uan.yaml"
 	} else {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_CLUSTER_ENTRY"))
 		workload_file = "/workloads/compute.yaml"
