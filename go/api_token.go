@@ -47,6 +47,12 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	ctx := context.Background()
 
 	xname := r.FormValue("xname")
+	serverType := r.FormValue("type")
+
+	if serverType == "" {
+		serverType = "compute"
+	}
+
 	log.Printf("Starting token generation with xname: %s", xname)
 
 	ttl, err := strconv.Atoi(os.Getenv("TTL"))
@@ -95,11 +101,13 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	isNCN, _ := regexp.MatchString("^ncn", xname)
-
 	var spiffe_id string
-	if isNCN {
+	if serverType == "ncn" {
 		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_ENTRY"), xname)
+	} else if serverType == "storage" {
+		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("STORAGE_ENTRY"), xname)
+	} else if serverType == "uan" {
+		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("UAN_ENTRY"), xname)
 	} else {
 		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_ENTRY"), xname)
 	}
@@ -124,9 +132,15 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 
 	var cluster_entry string
 	var workload_file string
-	if isNCN {
+	if serverType == "ncn" {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_CLUSTER_ENTRY"))
 		workload_file = "/workloads/ncn.yaml"
+	} else if serverType == "storage" {
+		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("STORAGE_CLUSTER_ENTRY"))
+		workload_file = "/workloads/storage.yaml"
+	} else if serverType == "uan" {
+		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("UAN_CLUSTER_ENTRY"))
+		workload_file = "/workloads/uan.yaml"
 	} else {
 		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_CLUSTER_ENTRY"))
 		workload_file = "/workloads/compute.yaml"
@@ -165,7 +179,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = CreateWorkloads(ctx, c, xname, workloads)
+		err = CreateWorkloads(ctx, c, xname, workloads, serverType)
 
 		if err != nil {
 			problem := ProblemDetails{
@@ -235,15 +249,7 @@ func CreateRegistrationRecord(ctx context.Context, c registration.RegistrationCl
 	return nil
 }
 
-func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xname string, workloads []Workload) error {
-
-	var serverType string
-	isNCN, _ := regexp.MatchString("^ncn", xname)
-	if isNCN {
-		serverType = "ncn"
-	} else {
-		serverType = "compute"
-	}
+func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xname string, workloads []Workload, serverType string) error {
 
 	for _, workload := range workloads {
 		m := regexp.MustCompile("^(.*)XNAME(.*)$")
