@@ -1,5 +1,5 @@
 ########### Build ##########
-FROM artifactory.algol60.net/docker.io/golang:alpine AS build
+FROM artifactory.algol60.net/docker.io/library/golang:alpine AS build
 
 RUN apk add --no-cache git build-base
 
@@ -10,7 +10,7 @@ RUN cd /build && go test -v ./...
 RUN cd /build && go build -o /usr/local/bin/spire-tokens
 
 ########## Runtime ##########
-FROM artifactory.algol60.net/docker.io/alpine:latest AS runtime
+FROM artifactory.algol60.net/docker.io/library/alpine:latest AS runtime
 
 RUN apk add --no-cache bash curl
 
