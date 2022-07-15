@@ -31,7 +31,7 @@ func TestGenerateToken(t *testing.T) {
 	}
 
 	// Check the response body is what we expect.
-	expected := "Error while dialing dial unix /tmp/spire-registration.sock"
+	expected := "Error while dialing dial unix /tmp/spire-server/private/api.sock"
 
 	if !strings.ContainsAny(rr.Body.String(), expected) {
 		t.Errorf("handler returned unexpected body: got %v want %v",

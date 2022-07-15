@@ -35,7 +35,7 @@ type Workload struct {
 
 const (
 	// Workload API (SPIRE default socket is assumed)
-	socketPath = "/tmp/spire-registration.sock"
+	socketPath = "/tmp/spire-server/private/api.sock"
 
 	// optional timeout for the client context
 	timeout = 5 * time.Second
