@@ -250,10 +250,17 @@ func CreateRegistrationRecord(ctx context.Context, c entryv1.EntryClient, parent
 			},
 		},
 	}
-	_, err := c.BatchCreateEntry(ctx, req)
+	resp, err := c.BatchCreateEntry(ctx, req)
+
+	// This needs to change if we expand to create more records at once.
+	if resp.Results[0].Status.Message != "OK" {
+		log.Printf("BatchCreateEntry Response: %v", resp)
+	}
+
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
@@ -293,7 +300,12 @@ func CreateWorkloads(ctx context.Context, c entryv1.EntryClient, xname string, w
 			}
 		}
 
-		_, err := c.BatchCreateEntry(ctx, req)
+		resp, err := c.BatchCreateEntry(ctx, req)
+
+		// This needs to change if we expand to create more records at once.
+		if resp.Results[0].Status.Message != "OK" {
+			log.Printf("BatchCreateEntry Response: %v", resp)
+		}
 		if err != nil {
 			return err
 		}
