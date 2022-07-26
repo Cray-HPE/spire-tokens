@@ -116,13 +116,13 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 
 	var spiffe_id string
 	if serverType == "ncn" {
-		spiffe_id = fmt.Sprintf("/%s%s", os.Getenv("NCN_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("%s/%s", os.Getenv("NCN_ENTRY"), xname)
 	} else if serverType == "storage" {
-		spiffe_id = fmt.Sprintf("%s%s/", os.Getenv("STORAGE_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("%s/%s", os.Getenv("STORAGE_ENTRY"), xname)
 	} else if serverType == "uan" {
-		spiffe_id = fmt.Sprintf("/%s%s", os.Getenv("UAN_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("%s/%s", os.Getenv("UAN_ENTRY"), xname)
 	} else {
-		spiffe_id = fmt.Sprintf("%s%s/", os.Getenv("COMPUTE_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("%s/%s", os.Getenv("COMPUTE_ENTRY"), xname)
 	}
 
 	node_parent := fmt.Sprintf("/spire/agent/join_token/%s", token)
