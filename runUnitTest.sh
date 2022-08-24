@@ -1,5 +1,4 @@
 #!/bin/bash
-
 #
 # MIT License
 #

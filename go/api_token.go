@@ -1,3 +1,28 @@
+/*
+ *
+ *  MIT License
+ *
+ *  (C) Copyright 2022 Hewlett Packard Enterprise Development LP
+ *
+ *  Permission is hereby granted, free of charge, to any person obtaining a
+ *  copy of this software and associated documentation files (the "Software"),
+ *  to deal in the Software without restriction, including without limitation
+ *  the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ *  and/or sell copies of the Software, and to permit persons to whom the
+ *  Software is furnished to do so, subject to the following conditions:
+ *
+ *  The above copyright notice and this permission notice shall be included
+ *  in all copies or substantial portions of the Software.
+ *
+ *  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ *  IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ *  FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL
+ *  THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR
+ *  OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE,
+ *  ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
+ *  OTHER DEALINGS IN THE SOFTWARE.
+ *
+ */
 // Copyright 2021 Hewlett Packard Enterprise Development LP
 
 package tokens
@@ -16,9 +41,9 @@ import (
 	"strings"
 	"time"
 
-	"github.com/spiffe/spire/pkg/common/idutil"
-	"github.com/spiffe/spire/proto/spire/api/registration"
-	"github.com/spiffe/spire/proto/spire/common"
+	agentv1 "github.com/spiffe/spire-api-sdk/proto/spire/api/server/agent/v1"
+	entryv1 "github.com/spiffe/spire-api-sdk/proto/spire/api/server/entry/v1"
+	"github.com/spiffe/spire-api-sdk/proto/spire/api/types"
 	"google.golang.org/grpc"
 	"gopkg.in/yaml.v2"
 )
@@ -35,7 +60,7 @@ type Workload struct {
 
 const (
 	// Workload API (SPIRE default socket is assumed)
-	socketPath = "/tmp/spire-registration.sock"
+	socketPath = "/tmp/spire-server/private/api.sock"
 
 	// optional timeout for the client context
 	timeout = 5 * time.Second
@@ -56,7 +81,6 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	log.Printf("Starting token generation with xname: %s", xname)
 
 	ttl, err := strconv.Atoi(os.Getenv("TTL"))
-
 	if err != nil {
 		ttl = 60
 	}
@@ -73,10 +97,10 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	c, err := NewRegistrationClient(socketPath, ctx)
+	ac, err := NewAgentClient(socketPath, ctx)
 	if err != nil {
 		problem := ProblemDetails{
-			Title:  "Error creating registration client",
+			Title:  "Error creating agent client",
 			Status: http.StatusInternalServerError,
 			Detail: fmt.Sprint(err.Error()),
 		}
@@ -87,7 +111,21 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	token, err := CreateToken(ctx, c, ttl)
+	ec, err := NewEntryClient(socketPath, ctx)
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error creating entry client",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	token, err := CreateToken(ctx, ac, ttl)
 	if err != nil {
 		problem := ProblemDetails{
 			Title:  "Error generating token",
@@ -103,17 +141,17 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 
 	var spiffe_id string
 	if serverType == "ncn" {
-		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("/%s/%s", os.Getenv("NCN_ENTRY"), xname)
 	} else if serverType == "storage" {
-		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("STORAGE_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("/%s/%s", os.Getenv("STORAGE_ENTRY"), xname)
 	} else if serverType == "uan" {
-		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("UAN_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("/%s/%s", os.Getenv("UAN_ENTRY"), xname)
 	} else {
-		spiffe_id = fmt.Sprintf("spiffe://%s%s/%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_ENTRY"), xname)
+		spiffe_id = fmt.Sprintf("/%s/%s", os.Getenv("COMPUTE_ENTRY"), xname)
 	}
 
-	node_parent := fmt.Sprintf("spiffe://%s/spire/agent/join_token/%s", os.Getenv("SPIRE_DOMAIN"), token)
-	err = CreateRegistrationRecord(ctx, c, node_parent, spiffe_id)
+	node_parent := fmt.Sprintf("/spire/agent/join_token/%s", token)
+	err = CreateRegistrationRecord(ctx, ec, node_parent, spiffe_id)
 
 	if err != nil {
 		problem := ProblemDetails{
@@ -133,20 +171,20 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	var cluster_entry string
 	var workload_file string
 	if serverType == "ncn" {
-		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("NCN_CLUSTER_ENTRY"))
+		cluster_entry = fmt.Sprintf("/%s", os.Getenv("NCN_CLUSTER_ENTRY"))
 		workload_file = "/workloads/ncn.yaml"
 	} else if serverType == "storage" {
-		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("STORAGE_CLUSTER_ENTRY"))
+		cluster_entry = fmt.Sprintf("/%s", os.Getenv("STORAGE_CLUSTER_ENTRY"))
 		workload_file = "/workloads/storage.yaml"
 	} else if serverType == "uan" {
-		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("UAN_CLUSTER_ENTRY"))
+		cluster_entry = fmt.Sprintf("/%s", os.Getenv("UAN_CLUSTER_ENTRY"))
 		workload_file = "/workloads/uan.yaml"
 	} else {
-		cluster_entry = fmt.Sprintf("spiffe://%s%s", os.Getenv("SPIRE_DOMAIN"), os.Getenv("COMPUTE_CLUSTER_ENTRY"))
+		cluster_entry = fmt.Sprintf("/%s", os.Getenv("COMPUTE_CLUSTER_ENTRY"))
 		workload_file = "/workloads/compute.yaml"
 	}
 
-	err = CreateRegistrationRecord(ctx, c, spiffe_id, cluster_entry) // cluster record
+	err = CreateRegistrationRecord(ctx, ec, spiffe_id, cluster_entry) // cluster record
 
 	if err != nil {
 		problem := ProblemDetails{
@@ -165,7 +203,6 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Creating xname workload entries for %s", xname)
 
 		workloads, err := ParseWorkloads(workload_file)
-
 		if err != nil {
 			problem := ProblemDetails{
 				Title:  "Error Reading Workloads Configuration file",
@@ -179,7 +216,7 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		err = CreateWorkloads(ctx, c, xname, workloads, serverType)
+		err = CreateWorkloads(ctx, ec, xname, workloads, serverType)
 
 		if err != nil {
 			problem := ProblemDetails{
@@ -204,80 +241,96 @@ func GenerateToken(w http.ResponseWriter, r *http.Request) {
 	}
 
 	json.NewEncoder(w).Encode(response)
-
-	return
 }
 
 func invalidID(id string) bool {
-
-	var validID = regexp.MustCompile(`^[a-zA-Z0-9]*$`)
+	validID := regexp.MustCompile(`^[a-zA-Z0-9]*$`)
 
 	if id == "" {
 		return true
 	}
+
 	return !validID.MatchString(id)
 }
 
-func CreateToken(ctx context.Context, c registration.RegistrationClient, ttl int) (string, error) {
-	req := &registration.JoinToken{Ttl: int32(ttl)}
+func CreateToken(ctx context.Context, c agentv1.AgentClient, ttl int) (string, error) {
+	req := &agentv1.CreateJoinTokenRequest{Ttl: int32(ttl)}
 	resp, err := c.CreateJoinToken(ctx, req)
 	if err != nil {
 		return "", err
 	}
 
-	return resp.Token, nil
+	return resp.Value, nil
 }
 
-func CreateRegistrationRecord(ctx context.Context, c registration.RegistrationClient, parentID, spiffeID string) error {
-	id, err := idutil.ParseSpiffeID(spiffeID, idutil.AllowAnyTrustDomainWorkload())
-	if err != nil {
-		return err
-	}
-
-	req := &common.RegistrationEntry{
-		ParentId: parentID,
-		SpiffeId: id.String(),
-		Selectors: []*common.Selector{
-			{Type: "spiffe_id", Value: parentID},
+func CreateRegistrationRecord(ctx context.Context, c entryv1.EntryClient, parentID, spiffeID string) error {
+	req := &entryv1.BatchCreateEntryRequest{
+		Entries: []*types.Entry{
+			{
+				ParentId: &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: parentID},
+				SpiffeId: &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: spiffeID},
+				Selectors: []*types.Selector{
+					{Type: "spiffe_id", Value: "spiffe://" + os.Getenv("SPIRE_DOMAIN") + parentID},
+				},
+			},
 		},
 	}
+	resp, err := c.BatchCreateEntry(ctx, req)
 
-	_, err = c.CreateEntryIfNotExists(ctx, req)
+	// This needs to change if we expand to create more records at once.
+	if resp.Results[0].Status.Message != "OK" {
+		log.Printf("BatchCreateEntry Response: %v", resp)
+	}
+
 	if err != nil {
 		return err
 	}
+
 	return nil
 }
 
-func CreateWorkloads(ctx context.Context, c registration.RegistrationClient, xname string, workloads []Workload, serverType string) error {
-
+func CreateWorkloads(ctx context.Context, c entryv1.EntryClient, xname string, workloads []Workload, serverType string) error {
 	for _, workload := range workloads {
 		m := regexp.MustCompile("^(.*)XNAME(.*)$")
 		workloadID := m.ReplaceAllString(workload.SpiffeID, "${1}"+xname+"${2}")
 
-		selectors := []*common.Selector{}
+		selectors := []*types.Selector{}
 		for _, selector := range workload.Selectors {
-			selectors = append(selectors, &common.Selector{Type: selector.Type, Value: selector.Value})
+			selectors = append(selectors, &types.Selector{Type: selector.Type, Value: selector.Value})
 		}
 
-		var req *common.RegistrationEntry
+		parentID := "/" + serverType + "/tenant1/" + xname
+
+		var req *entryv1.BatchCreateEntryRequest
 		if workload.Ttl != 0 {
-			req = &common.RegistrationEntry{
-				ParentId:  "spiffe://shasta/" + serverType + "/tenant1/" + xname,
-				SpiffeId:  workloadID,
-				Selectors: selectors,
-				Ttl:       workload.Ttl,
+			req = &entryv1.BatchCreateEntryRequest{
+				Entries: []*types.Entry{
+					{
+						ParentId:  &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: parentID},
+						SpiffeId:  &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: workloadID},
+						Selectors: selectors,
+						Ttl:       workload.Ttl,
+					},
+				},
 			}
 		} else {
-			req = &common.RegistrationEntry{
-				ParentId:  "spiffe://shasta/" + serverType + "/tenant1/" + xname,
-				SpiffeId:  workloadID,
-				Selectors: selectors,
+			req = &entryv1.BatchCreateEntryRequest{
+				Entries: []*types.Entry{
+					{
+						ParentId:  &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: parentID},
+						SpiffeId:  &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: workloadID},
+						Selectors: selectors,
+					},
+				},
 			}
-
 		}
 
-		_, err := c.CreateEntryIfNotExists(ctx, req)
+		resp, err := c.BatchCreateEntry(ctx, req)
+
+		// This needs to change if we expand to create more records at once.
+		if resp.Results[0].Status.Message != "OK" {
+			log.Printf("BatchCreateEntry Response: %v", resp)
+		}
 		if err != nil {
 			return err
 		}
@@ -299,12 +352,20 @@ func ParseWorkloads(file string) ([]Workload, error) {
 	return workloads, nil
 }
 
-func NewRegistrationClient(socketPath string, ctx context.Context) (registration.RegistrationClient, error) {
+func NewAgentClient(socketPath string, ctx context.Context) (agentv1.AgentClient, error) {
 	conn, err := grpc.Dial(socketPath, grpc.WithInsecure(), grpc.WithDialer(dialer)) //nolint: staticcheck
 	if err != nil {
 		return nil, err
 	}
-	return registration.NewRegistrationClient(conn), err
+	return agentv1.NewAgentClient(conn), err
+}
+
+func NewEntryClient(socketPath string, ctx context.Context) (entryv1.EntryClient, error) {
+	conn, err := grpc.Dial(socketPath, grpc.WithInsecure(), grpc.WithDialer(dialer)) //nolint: staticcheck
+	if err != nil {
+		return nil, err
+	}
+	return entryv1.NewEntryClient(conn), err
 }
 
 func dialer(addr string, timeout time.Duration) (net.Conn, error) {
