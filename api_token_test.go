@@ -425,3 +425,138 @@ func sendRequest(xname *strings.Reader, rr *httptest.ResponseRecorder, t *testin
 
 	handler.ServeHTTP(rr, req)
 }
+
+func TestCreateTPMWorkloadsXNAME(t *testing.T) {
+	ds := fakedatastore.New(t)
+	ctx := context.Background()
+
+	os.Setenv("ENABLE_XNAME_WORKLOADS", "true")
+
+	td, err := spiffeid.TrustDomainFromString("spiffe://shasta")
+	if err != nil {
+		t.Errorf("Failed to create trust domain: %v", err)
+	}
+
+	c := fakeentryclient.New(t, td, ds, nil)
+	xnames := []string{"uan1", "uan2"}
+	workloads := []tokens.Workload{
+		{
+			SpiffeID: "/test/XNAME/workload1",
+			Selectors: []tokens.WorkloadSelector{
+				{Type: "unix", Value: "uid:0"},
+				{Type: "unix", Value: "gid:0"},
+			},
+		},
+		{
+			SpiffeID: "/test/XNAME/workload2",
+			Selectors: []tokens.WorkloadSelector{
+				{Type: "unix", Value: "uid:0"},
+				{Type: "unix", Value: "gid:0"},
+			},
+			Ttl: 634000,
+		},
+	}
+
+	for _, xname := range xnames {
+		err := tokens.CreateTPMWorkloads(ctx, c, xname, workloads, "uan")
+		if err != nil {
+			t.Errorf("Failed to create registration record: %v", err)
+		}
+	}
+
+	regEntries, err := ds.ListRegistrationEntries(ctx, &datastore.ListRegistrationEntriesRequest{})
+	if err != nil {
+		t.Errorf("Failed to request registration entries: %v", err)
+	}
+
+	require.Equal(t, "spiffe://shasta/test/uan1/workload1", regEntries.Entries[0].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan1", regEntries.Entries[0].ParentId)
+	require.Equal(t, "subject:cn:uan:uan1", regEntries.Entries[0].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[0].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[0].Selectors[2].Value)
+	require.Equal(t, "spiffe://shasta/test/uan1/workload2", regEntries.Entries[1].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan1", regEntries.Entries[1].ParentId)
+	require.Equal(t, "subject:cn:uan:uan1", regEntries.Entries[1].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[1].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[1].Selectors[2].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[1].Ttl)
+	require.Equal(t, "spiffe://shasta/test/uan2/workload1", regEntries.Entries[2].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan2", regEntries.Entries[2].ParentId)
+	require.Equal(t, "subject:cn:uan:uan2", regEntries.Entries[2].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[2].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[2].Selectors[2].Value)
+	require.Equal(t, "spiffe://shasta/test/uan2/workload2", regEntries.Entries[3].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan2", regEntries.Entries[3].ParentId)
+	require.Equal(t, "subject:cn:uan:uan2", regEntries.Entries[3].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[3].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[3].Selectors[2].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[3].Ttl)
+}
+
+func TestCreateTPMWorkloads(t *testing.T) {
+	ds := fakedatastore.New(t)
+	ctx := context.Background()
+
+	td, err := spiffeid.TrustDomainFromString("spiffe://shasta")
+	if err != nil {
+		t.Errorf("Failed to create trust domain: %v", err)
+	}
+
+	c := fakeentryclient.New(t, td, ds, nil)
+	xnames := []string{"uan1", "uan2"}
+	workloads := []tokens.Workload{
+		{
+			SpiffeID: "/test/workload1",
+			Selectors: []tokens.WorkloadSelector{
+				{Type: "unix", Value: "uid:0"},
+				{Type: "unix", Value: "gid:0"},
+			},
+		},
+		{
+			SpiffeID: "/test/workload2",
+			Selectors: []tokens.WorkloadSelector{
+				{Type: "unix", Value: "uid:0"},
+				{Type: "unix", Value: "gid:0"},
+			},
+			Ttl: 634000,
+		},
+	}
+
+	for _, xname := range xnames {
+		err := tokens.CreateTPMWorkloads(ctx, c, xname, workloads, "uan")
+		if err != nil {
+			t.Errorf("Failed to create registration record: %v", err)
+		}
+	}
+
+	regEntries, err := ds.ListRegistrationEntries(ctx, &datastore.ListRegistrationEntriesRequest{})
+	if err != nil {
+		t.Errorf("Failed to request registration entries: %v", err)
+	}
+
+	require.Equal(t, "spiffe://shasta/test/workload1", regEntries.Entries[0].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan1", regEntries.Entries[0].ParentId)
+	require.Equal(t, "subject:cn:uan:uan1", regEntries.Entries[0].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[0].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[0].Selectors[2].Value)
+
+	require.Equal(t, "spiffe://shasta/test/workload1", regEntries.Entries[1].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan2", regEntries.Entries[1].ParentId)
+	require.Equal(t, "subject:cn:uan:uan2", regEntries.Entries[1].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[1].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[1].Selectors[2].Value)
+
+	require.Equal(t, "spiffe://shasta/test/workload2", regEntries.Entries[2].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan1", regEntries.Entries[2].ParentId)
+	require.Equal(t, "subject:cn:uan:uan1", regEntries.Entries[2].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[2].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[2].Selectors[2].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[2].Ttl)
+
+	require.Equal(t, "spiffe://shasta/test/workload2", regEntries.Entries[3].SpiffeId)
+	require.Equal(t, "spiffe://shasta/uan/tenant1/uan2", regEntries.Entries[3].ParentId)
+	require.Equal(t, "subject:cn:uan:uan2", regEntries.Entries[3].Selectors[0].Value)
+	require.Equal(t, "gid:0", regEntries.Entries[3].Selectors[1].Value)
+	require.Equal(t, "uid:0", regEntries.Entries[3].Selectors[2].Value)
+	require.Equal(t, int32(634000), regEntries.Entries[3].Ttl)
+}

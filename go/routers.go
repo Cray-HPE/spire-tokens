@@ -76,4 +76,11 @@ var routes = Routes{
 		"/api/token",
 		GenerateToken,
 	},
+
+	{
+		"GenerateTPMWorkloads",
+		strings.ToUpper("Post"),
+		"/api/tpmWorkloads",
+		GenerateTPMWorkloads,
+	},
 }
