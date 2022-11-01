@@ -125,7 +125,7 @@ func CreateTPMRegistrationRecord(ctx context.Context, c entryv1.EntryClient, xna
 	resp, err := c.BatchCreateEntry(ctx, req)
 
 	// This needs to change if we expand to create more records at once.
-	if resp.Results[0].Status.Message != "OK" {
+	if resp.Results[0].Status.Message != "OK" && resp.Results[0].Status.Code != 6 {
 		log.Printf("BatchCreateEntry Response: %v", resp)
 	}
 
