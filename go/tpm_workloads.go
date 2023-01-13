@@ -21,7 +21,9 @@ func GenerateTPMWorkloads(w http.ResponseWriter, r *http.Request) {
 
 	xname := r.FormValue("xname")
 
-	serverType := r.FormValue("type")
+	nodeType := r.FormValue("type")
+
+	log.Printf("Received TPM Workload Creation Request for %+v %+v", nodeType, xname)
 
 	ec, err := NewEntryClient(socketPath, ctx)
 	if err != nil {
@@ -39,7 +41,7 @@ func GenerateTPMWorkloads(w http.ResponseWriter, r *http.Request) {
 
 	var workloadFile string
 
-	switch serverType {
+	switch nodeType {
 	case "compute":
 		workloadFile = "/workloads/compute.yaml"
 	case "ncn":
@@ -52,7 +54,7 @@ func GenerateTPMWorkloads(w http.ResponseWriter, r *http.Request) {
 		problem := ProblemDetails{
 			Title:  "invalid node type",
 			Status: http.StatusInternalServerError,
-			Detail: fmt.Sprintf("%s is not a valid node type", serverType),
+			Detail: fmt.Sprintf("%s is not a valid node type", nodeType),
 		}
 		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -75,7 +77,22 @@ func GenerateTPMWorkloads(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	err = CreateTPMWorkloads(ctx, ec, xname, workloads, serverType)
+	err = CreateTPMRegistrationRecord(ctx, ec, xname, nodeType)
+
+	if err != nil {
+		problem := ProblemDetails{
+			Title:  "Error creating node registration record",
+			Status: http.StatusInternalServerError,
+			Detail: fmt.Sprint(err.Error()),
+		}
+		log.Printf("Error: %s, Detail: %s", problem.Title, problem.Detail)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(problem)
+
+		return
+	}
+
+	err = CreateTPMWorkloads(ctx, ec, xname, workloads, nodeType)
 
 	if err != nil {
 		problem := ProblemDetails{
@@ -91,21 +108,48 @@ func GenerateTPMWorkloads(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func CreateTPMRegistrationRecord(ctx context.Context, c entryv1.EntryClient, xname string, serverType string) error {
+	selector := &types.Selector{Type: "tpm_devid", Value: fmt.Sprintf("subject:cn:%s/%s", serverType, xname)}
+
+	spiffeID := "/" + serverType + "/tenant1/" + xname
+
+	req := &entryv1.BatchCreateEntryRequest{
+		Entries: []*types.Entry{
+			{
+				ParentId:  &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: "/spire/server"},
+				SpiffeId:  &types.SPIFFEID{TrustDomain: os.Getenv("SPIRE_DOMAIN"), Path: spiffeID},
+				Selectors: []*types.Selector{selector},
+			},
+		},
+	}
+	resp, err := c.BatchCreateEntry(ctx, req)
+
+	// This needs to change if we expand to create more records at once.
+	if resp.Results[0].Status.Message != "OK" && resp.Results[0].Status.Code != 6 {
+		log.Printf("BatchCreateEntry Response: %v", resp)
+	}
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func CreateTPMWorkloads(ctx context.Context, c entryv1.EntryClient, xname string, workloads []Workload, serverType string) error {
 	for _, workload := range workloads {
 		var workloadID string
-		m := regexp.MustCompile("^(.*)XNAME(.*)$")
+		m := regexp.MustCompile("^(.*)/XNAME/(.*)$")
 		if strings.ToLower(os.Getenv("ENABLE_XNAME_WORKLOADS")) == "true" {
-			workloadID = m.ReplaceAllString(workload.SpiffeID, "${1}"+xname+"${2}")
+			workloadID = m.ReplaceAllString(workload.SpiffeID, "${1}/"+xname+"/${2}")
 		} else {
-			workloadID = workload.SpiffeID
+			workloadID = m.ReplaceAllString(workload.SpiffeID, "${1}/${2}")
 		}
 
 		selectors := []*types.Selector{}
 		for _, selector := range workload.Selectors {
 			selectors = append(selectors, &types.Selector{Type: selector.Type, Value: selector.Value})
 		}
-		selectors = append(selectors, &types.Selector{Type: "tpm_devid", Value: fmt.Sprintf("subject:cn:%s:%s", serverType, xname)})
 
 		parentID := "/" + serverType + "/tenant1/" + xname
 
@@ -136,7 +180,7 @@ func CreateTPMWorkloads(ctx context.Context, c entryv1.EntryClient, xname string
 		resp, err := c.BatchCreateEntry(ctx, req)
 
 		// This needs to change if we expand to create more records at once.
-		if resp.Results[0].Status.Message != "OK" {
+		if resp.Results[0].Status.Message != "OK" && resp.Results[0].Status.Code != 6 {
 			log.Printf("BatchCreateEntry Response: %v", resp)
 		}
 		if err != nil {

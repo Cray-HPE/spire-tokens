@@ -328,7 +328,7 @@ func CreateWorkloads(ctx context.Context, c entryv1.EntryClient, xname string, w
 		resp, err := c.BatchCreateEntry(ctx, req)
 
 		// This needs to change if we expand to create more records at once.
-		if resp.Results[0].Status.Message != "OK" {
+		if resp.Results[0].Status.Message != "OK" && resp.Results[0].Status.Code != 6 {
 			log.Printf("BatchCreateEntry Response: %v", resp)
 		}
 		if err != nil {
