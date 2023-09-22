@@ -348,6 +348,9 @@ func ParseWorkloads(file string) ([]Workload, error) {
 	if err != nil {
 		return nil, err
 	}
+	for i, workload := range workloads {
+		workloads[i].SpiffeID = strings.TrimPrefix(workload.SpiffeID, "spiffe://"+os.Getenv("SPIRE_DOMAIN"))
+	}
 
 	return workloads, nil
 }
