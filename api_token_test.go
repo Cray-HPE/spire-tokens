@@ -127,14 +127,14 @@ func TestParseWorkloads(t *testing.T) {
 
 	expected := []tokens.Workload{
 		{
-			SpiffeID: "spiffe://shasta/ncn/XNAME/workload1",
+			SpiffeID: "/ncn/XNAME/workload1",
 			Selectors: []tokens.WorkloadSelector{
 				{Type: "unix", Value: "uid:0"},
 				{Type: "unix", Value: "gid:0"},
 			},
 		},
 		{
-			SpiffeID: "spiffe://shasta/ncn/XNAME/workload2",
+			SpiffeID: "/ncn/XNAME/workload2",
 			Selectors: []tokens.WorkloadSelector{
 				{Type: "unix", Value: "uid:0"},
 				{Type: "unix", Value: "gid:0"},
