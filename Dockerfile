@@ -22,7 +22,7 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 #
 ########### Build ##########
-FROM artifactory.algol60.net/docker.io/library/golang:alpine AS build
+FROM artifactory.algol60.net/docker.io/library/golang:1.17.3-alpine3.13 AS build
 
 RUN apk add --no-cache git build-base
 
