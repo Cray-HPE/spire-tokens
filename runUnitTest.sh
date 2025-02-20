@@ -25,7 +25,7 @@
 
 set -ex
 
-docker run --rm -v "${WORKSPACE}":/mnt/workspace -w /mnt/workspace artifactory.algol60.net/docker.io/library/golang:alpine /bin/sh -c '
+docker run --rm -v "${WORKSPACE}":/mnt/workspace -w /mnt/workspace artifactory.algol60.net/docker.io/library/golang:1.17.3-alpine3.13 /bin/sh -c '
 set -ex -o pipefail
 
 echo "Unit Tests for Go"
